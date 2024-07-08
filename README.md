@@ -9,3 +9,5 @@ Features:
 -  Stores detailed information about options and score on every question in a csv.
 
 To run create a virtual enviroment, install requirements.txt and import the benchmark function
+
+See a demo in **demo.ipynb**
