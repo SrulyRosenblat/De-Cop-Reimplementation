@@ -177,5 +177,5 @@ def benchmark(csv_file_name, content_type="text", test_model="gpt-3.5-turbo", mo
             print(f"Score: {item_total/item_count}")
     generations = pd.DataFrame(generations)
     generations.to_csv(generations_file_name)
-    print(f"Total Score: {total/len(df)}")
+    print(f"Total Score: {total/len(df)}, Score - Guess Chance: {total/len(df) - guess_chance}")
     return total / len(df)
