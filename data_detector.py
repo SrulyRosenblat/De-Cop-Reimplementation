@@ -39,24 +39,6 @@ def plagiarize(text,model="gpt-3.5-turbo",n=1) -> list:
         "content": [
             {
             "type": "text",
-            "text": "Paraphrase the following paragraph\n```\nYou had a data interpretation problem, so you tried clustering. Now you have a cluster interpretation problem! There was a suspicion that patterns might exist in the data. Reasonably, the hope was that adding some structure through unsupervised learning would lend some insights. Clusters are the go-to tool for finding structure. Thus, you embarked on your journey. You spend considerable money on computing. You invest a lot of sweat in fiddling with cluster tuning parameters. Just to be sure, you try a few algorithms. But at the end of the day you’re left with rainbow plots of clustered data that might have some meaning — just maybe — if you squint hard enough. You go home with an uneasy suspicion that it was all for naught. Sadly, this is too often the case. Why should this be though?\n```"
-            }
-        ]
-        },
-        {
-        "role": "assistant",
-        "content": [
-            {
-            "type": "text",
-            "text": "You faced a data interpretation challenge and decided to use clustering as a solution. Unfortunately, this led to a new issue: interpreting the clusters themselves. There was an initial belief that patterns might be present in the data, and it seemed reasonable to think that using unsupervised learning to add some structure would provide insights. Clustering is typically the method of choice for uncovering structure, so you proceeded with it. You spent significant funds on computing resources and put in a lot of effort adjusting the clustering parameters. To cover all bases, you experimented with several algorithms. Yet, at the end of the process, you were left with colorful plots of clustered data that seemed to hold meaning only if you strained to see it. You went home with a nagging feeling that the effort might have been in vain. Unfortunately, this scenario is all too common. But why does this happen so often?"
-            }
-        ]
-        },
-        {
-        "role": "user",
-        "content": [
-            {
-            "type": "text",
             "text": f"Paraphrase the following paragraph\n```\n{text}\n```"
             }
         ]
@@ -71,10 +53,11 @@ def plagiarize(text,model="gpt-3.5-turbo",n=1) -> list:
     )
     return [a.message.content for a in response.choices]
 
-def answer_question(question,n_choices, model="gpt-3.5-turbo", retries=3) -> int:
+def answer_question(question,n_choices, model="gpt-3.5-turbo", retries=5) -> int:
     """
     Given a question, answer it
     """
+    temperature = 0.1
     while True:
         try:
             response = completion(
@@ -95,7 +78,7 @@ def answer_question(question,n_choices, model="gpt-3.5-turbo", retries=3) -> int
             parsed_response = parse(response, n_choices)
             return parsed_response
         except Exception as e:
-
+            temperature = temperature * 2
             if retries == 0:
                 raise e
             retries -= 1
@@ -159,16 +142,21 @@ def benchmark(csv_file_name, content_type="text", test_model="gpt-3.5-turbo", mo
         item_total = 0
         print(f"Benchmarking {name}")
         for i, row in tqdm(group.iterrows(), total=group.shape[0]):
-            alternatives = generate_alternatives(row["Text"], models_to_plagiarize, generations_per_model)
-            # print(row["Text"], alternatives)
-            prompt = build_multi_choice_prompt(alternatives,name, content_type)
-            time.sleep(wait_between_generations)
-            answer = answer_question(prompt, len(alternatives), test_model)
-            grade = grade_choice(answer, alternatives)
-            generations.append({"Name":name,"Options":alternatives, "Question":prompt, "Answer":answer, "Model":test_model, "Grade":grade})
-            item_total += grade
-            total += grade
-            time.sleep(wait_between_generations)
+            try:
+                alternatives = generate_alternatives(row["Text"], models_to_plagiarize, generations_per_model)
+                # print(row["Text"], alternatives)
+                prompt = build_multi_choice_prompt(alternatives,name, content_type)
+                time.sleep(wait_between_generations)
+                answer = answer_question(prompt, len(alternatives), test_model)
+                grade = grade_choice(answer, alternatives)
+                generations.append({"Name":name,"Options":alternatives, "Question":prompt, "Answer":answer, "Model":test_model, "Grade":grade})
+                item_total += grade
+                total += grade
+                time.sleep(wait_between_generations)
+            except Exception as e:
+                print(e)
+                print("Skipping")
+                item_count -= 1
                 
         
         if guess_chance > 0:
@@ -177,5 +165,8 @@ def benchmark(csv_file_name, content_type="text", test_model="gpt-3.5-turbo", mo
             print(f"Score: {item_total/item_count}")
     generations = pd.DataFrame(generations)
     generations.to_csv(generations_file_name)
-    print(f"Total Score: {total/len(df)}, Score - Guess Chance: {total/len(df) - guess_chance}")
+    if guess_chance > 0:
+        print(f"Total Score: {total/len(df)}, Score - Guess Chance: {total/len(df) - guess_chance}")
+    else:
+        print(f"Total Score: {total/len(df)}")
     return total / len(df)
